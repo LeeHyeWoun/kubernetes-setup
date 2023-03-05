@@ -1,0 +1,156 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+master_node_count=1
+worker_node_count=3
+
+gest_port=22
+
+if not Dir.exist?("data")
+  Dir.mkdir("data")
+end
+
+if not Dir.exist?("sh")
+  Dir.mkdir("sh")
+end
+
+install_script_path = "./sh/install_pkg.sh"
+if not File.exist?(install_script_path)
+  File.open(install_script_path, "w") do |f|
+    f.write("#!/usr/bin/env bash\n")
+    f.write("# install packages\n")
+    f.write("yum install epel-release -y\n")
+    f.write("yum install vim-enhanced -y\n")
+  end
+end
+
+ping_2_nds_path = "./sh/ping_2_nds.sh"
+if not File.exist?(ping_2_nds_path)
+  File.open(ping_2_nds_path, "w") do |f|
+    f.write("# ping 3 times per nodes\n")
+    (1..worker_node_count).each do |i|
+      f.write("ping 192.168.1.10#{i} -c 3\n")
+    end
+  end
+end
+
+Vagrant.configure("2") do |config|
+
+  if !Vagrant.has_plugin?("vagrant-vmware-desktop")
+    puts "vagrant-vmware-desktop plugin is required, please install it first."
+    exit
+  end
+
+  (1..master_node_count=1).each do |i|
+    if File.exist?("/.vagrant/machines/m#{i}-k8s/vmware_desktop/id")
+      next
+    end  
+    config.vm.define "m#{i}-k8s" do |node|
+      node.vm.box="generic/centos8"
+      node.vm.provider "vmware_desktop" do |vmw|
+        vmw.cpus=2
+        vmw.memory=2048
+      end
+      node.vm.hostname="m#{i}-k8s"
+      node.vm.network "private_network", ip: "192.168.1.10#{i}"
+      node.vm.network "forwarded_port", guest: gest_port, host: "6010#{i}", auto_correct:true, id:"ssh"
+      node.vm.synced_folder "data", "/vagrant", disabled:true
+      node.vm.provision "shell", path: install_script_path
+      node.vm.provision "file", source: ping_2_nds_path, destination: ping_2_nds_path
+      node.vm.provision "shell", inline: <<-SHELL
+        echo chmod 744 ./sh/ping_2_nds.sh
+        echo 'vagrant:vagrant' | chpasswd
+      SHELL
+    end
+  end
+
+
+  (1..worker_node_count).each do |i|
+    if File.exist?("/.vagrant/machines/w#{i}-k8s/vmware_desktop/id")
+      next
+    end
+    config.vm.define "w#{i}-k8s" do |node|
+      node.vm.box="generic/centos8"
+      node.vm.provider "vmware_desktop" do |vmw|
+        vmw.cpus=2
+        vmw.memory=2048
+      end
+      node.vm.hostname="w#{i}-k8s"
+      node.vm.network "private_network", ip: "192.168.1.20#{i}"
+      node.vm.network "forwarded_port", guest: gest_port, host: "6020#{i}", auto_correct:true, id:"ssh"
+      node.vm.synced_folder "data", "/vagrant", disabled:true
+      node.vm.provision "shell", path: install_script_path
+      node.vm.provision "shell", inline: <<-SHELL
+        echo 'vagrant:vagrant' | chpasswd
+      SHELL
+    end
+  end
+end
+
+# All Vagrant configuration is done below. The "2" in Vagrant.configure
+# configures the configuration version (we support older styles for
+# backwards compatibility). Please don't change it unless you know what
+# you're doing.
+# Vagrant.configure("2") do |config|
+  # The most common configuration options are documented and commented below.
+  # For a complete reference, please see the online documentation at
+  # https://docs.vagrantup.com.
+
+  # Every Vagrant development environment requires a box. You can search for
+  # boxes at https://vagrantcloud.com/search.
+  # config.vm.box = "base"
+
+  # Disable automatic box update checking. If you disable this, then
+  # boxes will only be checked for updates when the user runs
+  # `vagrant box outdated`. This is not recommended.
+  # config.vm.box_check_update = false
+
+  # Create a forwarded port mapping which allows access to a specific port
+  # within the machine from a port on the host machine. In the example below,
+  # accessing "localhost:8080" will access port 80 on the guest machine.
+  # NOTE: This will enable public access to the opened port
+  # config.vm.network "forwarded_port", guest: 80, host: 8080
+
+  # Create a forwarded port mapping which allows access to a specific port
+  # within the machine from a port on the host machine and only allow access
+  # via 127.0.0.1 to disable public access
+  # config.vm.network "forwarded_port", guest: 80, host: 8080, host_ip: "127.0.0.1"
+
+  # Create a private network, which allows host-only access to the machine
+  # using a specific IP.
+  # config.vm.network "private_network", ip: "192.168.33.10"
+
+  # Create a public network, which generally matched to bridged network.
+  # Bridged networks make the machine appear as another physical device on
+  # your network.
+  # config.vm.network "public_network"
+
+  # Share an additional folder to the guest VM. The first argument is
+  # the path on the host to the actual folder. The second argument is
+  # the path on the guest to mount the folder. And the optional third
+  # argument is a set of non-required options.
+  # config.vm.synced_folder "../data", "/vagrant_data"
+
+  # Provider-specific configuration so you can fine-tune various
+  # backing providers for Vagrant. These expose provider-specific options.
+  # Example for VirtualBox:
+  #
+  # config.vm.provider "virtualbox" do |vb|
+  #   # Display the VirtualBox GUI when booting the machine
+  #   vb.gui = true
+  #
+  #   # Customize the amount of memory on the VM:
+  #   vb.memory = "1024"
+  # end
+  #
+  # View the documentation for the provider you are using for more
+  # information on available options.
+
+  # Enable provisioning with a shell script. Additional provisioners such as
+  # Ansible, Chef, Docker, Puppet and Salt are also available. Please see the
+  # documentation for more information about their specific syntax and use.
+  # config.vm.provision "shell", inline: <<-SHELL
+  #   apt-get update
+  #   apt-get install -y apache2
+  # SHELL
+#end
