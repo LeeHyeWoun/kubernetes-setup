@@ -38,16 +38,16 @@ Vagrant.configure("2") do |config|
   end
 
   (1..NM=1).each do |i|
-    if File.exist?("/.vagrant/machines/m#{i}-k8s/vmware_desktop/id")
+    if File.exist?("/.vagrant/machines/master#{i}/vmware_desktop/id")
       next
     end  
-    config.vm.define "m#{i}-k8s" do |node|
+    config.vm.define "master#{i}" do |node|
       node.vm.box="generic/centos8"
       node.vm.provider "vmware_desktop" do |vmw|
         vmw.cpus=2
         vmw.memory=2048
       end
-      node.vm.hostname="m#{i}-k8s"
+      node.vm.hostname="master#{i}"
       node.vm.network "private_network", ip: "192.168.1.10#{i}"
       node.vm.network "forwarded_port", guest: GUEST, host: "6010#{i}", auto_correct:true, id:"ssh"
       node.vm.synced_folder "data", "/vagrant", disabled:true
@@ -62,16 +62,16 @@ Vagrant.configure("2") do |config|
 
 
   (1..NW).each do |i|
-    if File.exist?("/.vagrant/machines/w#{i}-k8s/vmware_desktop/id")
+    if File.exist?("/.vagrant/machines/worker#{i}/vmware_desktop/id")
       next
     end
-    config.vm.define "w#{i}-k8s" do |node|
+    config.vm.define "worker#{i}" do |node|
       node.vm.box="generic/centos8"
       node.vm.provider "vmware_desktop" do |vmw|
         vmw.cpus=2
         vmw.memory=2048
       end
-      node.vm.hostname="w#{i}-k8s"
+      node.vm.hostname="worker#{i}"
       node.vm.network "private_network", ip: "192.168.1.20#{i}"
       node.vm.network "forwarded_port", guest: GUEST, host: "6020#{i}", auto_correct:true, id:"ssh"
       node.vm.synced_folder "data", "/vagrant", disabled:true
