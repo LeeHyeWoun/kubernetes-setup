@@ -1,20 +1,16 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
 
-master_node_count=1
-worker_node_count=3
+NM=1 # num of master nodes
+NW=3 # num of woker nodes
 
-gest_port=22
+GUEST=22
 
 if not Dir.exist?("data")
   Dir.mkdir("data")
 end
 
-if not Dir.exist?("sh")
-  Dir.mkdir("sh")
-end
-
-install_script_path = "./sh/install_pkg.sh"
+install_script_path = "./install_pkg.sh"
 if not File.exist?(install_script_path)
   File.open(install_script_path, "w") do |f|
     f.write("#!/usr/bin/env bash\n")
@@ -24,12 +20,12 @@ if not File.exist?(install_script_path)
   end
 end
 
-ping_2_nds_path = "./sh/ping_2_nds.sh"
+ping_2_nds_path = "./ping_2_nds.sh"
 if not File.exist?(ping_2_nds_path)
   File.open(ping_2_nds_path, "w") do |f|
     f.write("# ping 3 times per nodes\n")
-    (1..worker_node_count).each do |i|
-      f.write("ping 192.168.1.10#{i} -c 3\n")
+    (1..NW).each do |i|
+      f.write("ping 192.168.1.20#{i} -c 3\n")
     end
   end
 end
@@ -41,7 +37,7 @@ Vagrant.configure("2") do |config|
     exit
   end
 
-  (1..master_node_count=1).each do |i|
+  (1..NM=1).each do |i|
     if File.exist?("/.vagrant/machines/m#{i}-k8s/vmware_desktop/id")
       next
     end  
@@ -53,19 +49,19 @@ Vagrant.configure("2") do |config|
       end
       node.vm.hostname="m#{i}-k8s"
       node.vm.network "private_network", ip: "192.168.1.10#{i}"
-      node.vm.network "forwarded_port", guest: gest_port, host: "6010#{i}", auto_correct:true, id:"ssh"
+      node.vm.network "forwarded_port", guest: GUEST, host: "6010#{i}", auto_correct:true, id:"ssh"
       node.vm.synced_folder "data", "/vagrant", disabled:true
       node.vm.provision "shell", path: install_script_path
       node.vm.provision "file", source: ping_2_nds_path, destination: ping_2_nds_path
       node.vm.provision "shell", inline: <<-SHELL
-        echo chmod 744 ./sh/ping_2_nds.sh
+        echo chmod 744 ./ping_2_nds.sh
         echo 'vagrant:vagrant' | chpasswd
       SHELL
     end
   end
 
 
-  (1..worker_node_count).each do |i|
+  (1..NW).each do |i|
     if File.exist?("/.vagrant/machines/w#{i}-k8s/vmware_desktop/id")
       next
     end
@@ -77,7 +73,7 @@ Vagrant.configure("2") do |config|
       end
       node.vm.hostname="w#{i}-k8s"
       node.vm.network "private_network", ip: "192.168.1.20#{i}"
-      node.vm.network "forwarded_port", guest: gest_port, host: "6020#{i}", auto_correct:true, id:"ssh"
+      node.vm.network "forwarded_port", guest: GUEST, host: "6020#{i}", auto_correct:true, id:"ssh"
       node.vm.synced_folder "data", "/vagrant", disabled:true
       node.vm.provision "shell", path: install_script_path
       node.vm.provision "shell", inline: <<-SHELL
